@@ -8,9 +8,10 @@ import java.util.Set;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
+import org.apache.lucene.index.TermStates;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.spans.SpanQuery;
 import org.apache.lucene.search.spans.SpanWeight;
 import org.apache.lucene.search.spans.Spans;
@@ -35,10 +36,9 @@ public class SpanMinFrequencyFilterQuery extends SpanQuery implements Cloneable 
 	}
 
 	@Override
-	public SpanWeight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
-		SpanWeight matchWeight = match.createWeight(searcher, false, boost);
-		return new MinFrequencySpanCountingCheckWeight(matchWeight, searcher,
-				needsScores ? getTermContexts(matchWeight) : null, boost);
+	public SpanWeight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
+		SpanWeight matchWeight = match.createWeight(searcher, ScoreMode.COMPLETE, boost);
+		return new MinFrequencySpanCountingCheckWeight(matchWeight, searcher, getTermStates(matchWeight), boost);
 	}
 
 	public class MinFrequencySpanCountingCheckWeight extends SpanWeight {
@@ -46,7 +46,7 @@ public class SpanMinFrequencyFilterQuery extends SpanQuery implements Cloneable 
 		final SpanWeight matchWeight;
 
 		public MinFrequencySpanCountingCheckWeight(SpanWeight matchWeight, IndexSearcher searcher,
-				Map<Term, TermContext> terms, float boost) throws IOException {
+				Map<Term, TermStates> terms, float boost) throws IOException {
 			super(SpanMinFrequencyFilterQuery.this, searcher, terms, boost);
 			this.matchWeight = matchWeight;
 		}
@@ -62,8 +62,8 @@ public class SpanMinFrequencyFilterQuery extends SpanQuery implements Cloneable 
 		}
 
 		@Override
-		public void extractTermContexts(Map<Term, TermContext> contexts) {
-			matchWeight.extractTermContexts(contexts);
+		public void extractTermStates(Map<Term, TermStates> contexts) {
+			matchWeight.extractTermStates(contexts);
 		}
 
 		@Override

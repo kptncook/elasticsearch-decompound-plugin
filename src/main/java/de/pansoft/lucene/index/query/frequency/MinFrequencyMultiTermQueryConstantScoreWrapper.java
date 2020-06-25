@@ -6,15 +6,7 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.search.BulkScorer;
-import org.apache.lucene.search.ConstantScoreScorer;
-import org.apache.lucene.search.ConstantScoreWeight;
-import org.apache.lucene.search.DocIdSet;
-import org.apache.lucene.search.DocIdSetIterator;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.Weight;
+import org.apache.lucene.search.*;
 import org.apache.lucene.util.AttributeSource;
 import org.apache.lucene.util.DocIdSetBuilder;
 
@@ -57,7 +49,7 @@ final class MinFrequencyMultiTermQueryConstantScoreWrapper<Q extends MinFrequenc
 	}
 
 	@Override
-	public Weight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
+	public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
 		return new ConstantScoreWeight(this, boost) {
 
 			private DocIdSet rewrite(LeafReaderContext context) throws IOException {
@@ -83,7 +75,7 @@ final class MinFrequencyMultiTermQueryConstantScoreWrapper<Q extends MinFrequenc
 				if (disi == null) {
 					return null;
 				}
-				return new ConstantScoreScorer(this, score(), disi);
+				return new ConstantScoreScorer(this, score(), scoreMode, disi);
 			}
 
 			@Override

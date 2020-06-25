@@ -35,7 +35,7 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
     public static final String NAME = "genios_query_string";
     
     public static final MultiMatchQueryBuilder.Type DEFAULT_TYPE = MultiMatchQueryBuilder.Type.BEST_FIELDS;
-    
+
     private static final ParseField QUERY_FIELD = new ParseField("query");
     private static final ParseField FIELDS_FIELD = new ParseField("fields");
     private static final ParseField DEFAULT_FIELD_FIELD = new ParseField("default_field");
@@ -43,16 +43,9 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
     private static final ParseField ANALYZER_FIELD = new ParseField("analyzer");
     private static final ParseField QUOTE_ANALYZER_FIELD = new ParseField("quote_analyzer");
     private static final ParseField ALLOW_LEADING_WILDCARD_FIELD = new ParseField("allow_leading_wildcard");
-    private static final ParseField AUTO_GENERATE_PHRASE_QUERIES_FIELD = new ParseField("auto_generate_phrase_queries")
-            .withAllDeprecated("This setting is ignored, use [type=phrase] instead to make phrase queries out of all text that " +
-                "is within query operators, or use explicitly quoted strings if you need finer-grained control");
     private static final ParseField MAX_DETERMINIZED_STATES_FIELD = new ParseField("max_determinized_states");
-    private static final ParseField LOWERCASE_EXPANDED_TERMS_FIELD = new ParseField("lowercase_expanded_terms")
-            .withAllDeprecated("Decision is now made by the analyzer");
     private static final ParseField ENABLE_POSITION_INCREMENTS_FIELD = new ParseField("enable_position_increments");
     private static final ParseField ESCAPE_FIELD = new ParseField("escape");
-    private static final ParseField USE_DIS_MAX_FIELD = new ParseField("use_dis_max")
-            .withAllDeprecated("Set [tie_breaker] to 1 instead");
     private static final ParseField FUZZY_PREFIX_LENGTH_FIELD = new ParseField("fuzzy_prefix_length");
     private static final ParseField FUZZY_MAX_EXPANSIONS_FIELD = new ParseField("fuzzy_max_expansions");
     private static final ParseField FUZZY_REWRITE_FIELD = new ParseField("fuzzy_rewrite");
@@ -63,18 +56,12 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
     private static final ParseField MINIMUM_SHOULD_MATCH_FIELD = new ParseField("minimum_should_match");
     private static final ParseField QUOTE_FIELD_SUFFIX_FIELD = new ParseField("quote_field_suffix");
     private static final ParseField LENIENT_FIELD = new ParseField("lenient");
-    private static final ParseField LOCALE_FIELD = new ParseField("locale")
-            .withAllDeprecated("Decision is now made by the analyzer");
     private static final ParseField TIME_ZONE_FIELD = new ParseField("time_zone");
-    private static final ParseField SPLIT_ON_WHITESPACE = new ParseField("split_on_whitespace")
-            .withAllDeprecated("This setting is ignored, the parser always splits on operator");
-    private static final ParseField ALL_FIELDS_FIELD = new ParseField("all_fields")
-            .withAllDeprecated("Set [default_field] to `*` instead");
     private static final ParseField TYPE_FIELD = new ParseField("type");
     private static final ParseField GENERATE_SYNONYMS_PHRASE_QUERY = new ParseField("auto_generate_synonyms_phrase_query");
     private static final ParseField FUZZY_TRANSPOSITIONS_FIELD = new ParseField("fuzzy_transpositions");
 
-	public GeniosQueryStringQueryBuilder(String queryString) throws IOException {
+    public GeniosQueryStringQueryBuilder(String queryString) throws IOException {
 		super(queryString);
 	}
 
@@ -142,7 +129,7 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
             builder.field(LENIENT_FIELD.getPreferredName(), this.lenient());
         }
         if (this.timeZone() != null) {
-            builder.field(TIME_ZONE_FIELD.getPreferredName(), this.timeZone().getID());
+            builder.field(TIME_ZONE_FIELD.getPreferredName(), this.timeZone().getId());
         }
         builder.field(ESCAPE_FIELD.getPreferredName(), this.escape());
         builder.field(GENERATE_SYNONYMS_PHRASE_QUERY.getPreferredName(), autoGenerateSynonymsPhraseQuery());
@@ -242,8 +229,6 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
                     quoteFieldSuffix = parser.textOrNull();
                 } else if (LENIENT_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                     lenient = parser.booleanValue();
-                } else if (ALL_FIELDS_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
-                    defaultField = "*";
                 } else if (MAX_DETERMINIZED_STATES_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                     maxDeterminizedStates = parser.intValue();
                 } else if (TIME_ZONE_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
@@ -259,16 +244,6 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
                     autoGenerateSynonymsPhraseQuery = parser.booleanValue();
                 } else if (FUZZY_TRANSPOSITIONS_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
                     fuzzyTranspositions = parser.booleanValue();
-                } else if (AUTO_GENERATE_PHRASE_QUERIES_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
-                    // ignore, deprecated setting
-                } else if (LOWERCASE_EXPANDED_TERMS_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
-                    // ignore, deprecated setting
-                } else if (LOCALE_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
-                    // ignore, deprecated setting
-                } else if (USE_DIS_MAX_FIELD.match(currentFieldName, parser.getDeprecationHandler())) {
-                    // ignore, deprecated setting
-                } else if (SPLIT_ON_WHITESPACE.match(currentFieldName, parser.getDeprecationHandler())) {
-                    // ignore, deprecated setting
                 } else {
                     throw new ParsingException(parser.getTokenLocation(), "[" + GeniosQueryStringQueryBuilder.NAME +
                             "] query does not support [" + currentFieldName + "]");
@@ -333,16 +308,14 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
             }
         } else if (fields().size() > 0) {
             final Map<String, Float> resolvedFields = QueryParserHelper.resolveMappingFields(context, fields());
-            queryParser = new GeniosQueryStringQueryParser(context, resolvedFields, isLenient);
+            if (QueryParserHelper.hasAllFieldsWildcard(fields().keySet())) {
+                queryParser = new GeniosQueryStringQueryParser(context, resolvedFields, lenient() == null ? true : lenient());
+            } else {
+                queryParser = new GeniosQueryStringQueryParser(context, resolvedFields, isLenient);
+            }
         } else {
             List<String> defaultFields = context.defaultFields();
-            if (context.getMapperService().allEnabled() == false &&
-                    defaultFields.size() == 1 && AllFieldMapper.NAME.equals(defaultFields.get(0))) {
-                // For indices created before 6.0 with _all disabled
-                defaultFields = Collections.singletonList("*");
-            }
-            boolean isAllField = defaultFields.size() == 1 && Regex.isMatchAllPattern(defaultFields.get(0));
-            if (isAllField) {
+            if (QueryParserHelper.hasAllFieldsWildcard(defaultFields)) {
                 queryParser = new GeniosQueryStringQueryParser(context, lenient() == null ? true : lenient());
             } else {
                 final Map<String, Float> resolvedFields = QueryParserHelper.resolveMappingFields(context,
@@ -368,11 +341,11 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
         }
 
         queryParser.setDefaultOperator(defaultOperator().toQueryParserOperator());
-        queryParser.setType(this.type);
+        queryParser.setType(type);
         if (tieBreaker() != null) {
             queryParser.setGroupTieBreaker(tieBreaker());
         } else {
-            queryParser.setGroupTieBreaker(DEFAULT_TYPE.tieBreaker());
+            queryParser.setGroupTieBreaker(type.tieBreaker());
         }
         queryParser.setPhraseSlop(phraseSlop());
         queryParser.setQuoteFieldSuffix(quoteFieldSuffix());

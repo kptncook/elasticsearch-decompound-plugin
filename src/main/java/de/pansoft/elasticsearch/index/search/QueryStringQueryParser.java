@@ -28,7 +28,18 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.queryparser.classic.Token;
 import org.apache.lucene.queryparser.classic.XQueryParser;
-import org.apache.lucene.search.*;
+import org.apache.lucene.search.BooleanClause;
+import org.apache.lucene.search.BoostAttribute;
+import org.apache.lucene.search.BoostQuery;
+import org.apache.lucene.search.DisjunctionMaxQuery;
+import org.apache.lucene.search.FuzzyQuery;
+import org.apache.lucene.search.MatchNoDocsQuery;
+import org.apache.lucene.search.MultiPhraseQuery;
+import org.apache.lucene.search.MultiTermQuery;
+import org.apache.lucene.search.PhraseQuery;
+import org.apache.lucene.search.Query;
+import org.apache.lucene.search.SynonymQuery;
+import org.apache.lucene.search.WildcardQuery;
 import org.apache.lucene.search.spans.SpanNearQuery;
 import org.apache.lucene.search.spans.SpanOrQuery;
 import org.apache.lucene.search.spans.SpanQuery;
@@ -38,23 +49,29 @@ import org.elasticsearch.common.regex.Regex;
 import org.elasticsearch.common.unit.Fuzziness;
 import org.elasticsearch.core.internal.io.IOUtils;
 import org.elasticsearch.index.IndexSettings;
-import org.elasticsearch.index.mapper.*;
+import org.elasticsearch.index.mapper.AllFieldMapper;
+import org.elasticsearch.index.mapper.FieldNamesFieldMapper;
+import org.elasticsearch.index.mapper.MappedFieldType;
+import org.elasticsearch.index.mapper.MapperService;
 import org.elasticsearch.index.query.ExistsQueryBuilder;
 import org.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.QueryShardContext;
 import org.elasticsearch.index.query.support.QueryParsers;
 import org.elasticsearch.index.search.MatchQuery;
-import org.joda.time.DateTimeZone;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import static org.elasticsearch.common.lucene.search.Queries.*;
-import static org.elasticsearch.index.search.QueryParserHelper.resolveMappingField;
-import static org.elasticsearch.index.search.QueryParserHelper.resolveMappingFields;
+import static org.elasticsearch.common.lucene.search.Queries.fixNegativeQueryIfNeeded;
+import static org.elasticsearch.common.lucene.search.Queries.newLenientFieldQuery;
+import static org.elasticsearch.common.lucene.search.Queries.newUnmappedFieldQuery;
+import static de.pansoft.elasticsearch.index.search.QueryParserHelper.checkForTooManyFields;
+import static de.pansoft.elasticsearch.index.search.QueryParserHelper.resolveMappingField;
+import static de.pansoft.elasticsearch.index.search.QueryParserHelper.resolveMappingFields;
 import static org.apache.lucene.queryparser.classic.QueryParser.Operator;
 
 /**
@@ -78,7 +95,7 @@ public class QueryStringQueryParser extends QueryParser {
     private Analyzer forceQuoteAnalyzer;
     private String quoteFieldSuffix;
     private boolean analyzeWildcard;
-    private DateTimeZone timeZone;
+    private ZoneId timeZone;
     private Fuzziness fuzziness = Fuzziness.AUTO;
     private int fuzzyMaxExpansions = FuzzyQuery.defaultMaxExpansions;
     private MappedFieldType currentFieldType;
@@ -120,14 +137,14 @@ public class QueryStringQueryParser extends QueryParser {
     }
 
     /**
-     * Defaults to all queryiable fields extracted from the mapping for query terms
+     * Defaults to all queryable fields extracted from the mapping for query terms
      * @param context The query shard context
      * @param lenient If set to `true` will cause format based failures (like providing text to a numeric field) to be ignored.
      */
     public QueryStringQueryParser(QueryShardContext context, boolean lenient) {
         this(context, "*",
-            resolveMappingField(context, "*", 1.0f, false, false),
-            lenient, context.getMapperService().searchAnalyzer());
+                resolveMappingField(context, "*", 1.0f, false, false, null),
+                lenient, context.getMapperService().searchAnalyzer());
     }
 
     private QueryStringQueryParser(QueryShardContext context, String defaultField,
@@ -140,6 +157,12 @@ public class QueryStringQueryParser extends QueryParser {
         queryBuilder.setZeroTermsQuery(MatchQuery.ZeroTermsQuery.NULL);
         queryBuilder.setLenient(lenient);
         this.lenient = lenient;
+    }
+
+    @Override
+    public void setEnablePositionIncrements(boolean enable) {
+        super.setEnablePositionIncrements(enable);
+        queryBuilder.setEnablePositionIncrements(enable);
     }
 
     @Override
@@ -216,7 +239,7 @@ public class QueryStringQueryParser extends QueryParser {
     /**
      * @param timeZone Time Zone to be applied to any range query related to dates.
      */
-    public void setTimeZone(DateTimeZone timeZone) {
+    public void setTimeZone(ZoneId timeZone) {
         this.timeZone = timeZone;
     }
 
@@ -250,32 +273,24 @@ public class QueryStringQueryParser extends QueryParser {
     }
 
     private Map<String, Float> extractMultiFields(String field, boolean quoted) {
+        Map<String, Float> extractedFields;
         if (field != null) {
             boolean allFields = Regex.isMatchAllPattern(field);
             if (allFields && this.field != null && this.field.equals(field)) {
                 // "*" is the default field
-                return fieldsAndWeights;
+                extractedFields = fieldsAndWeights;
             }
             boolean multiFields = Regex.isSimpleMatchPattern(field);
             // Filters unsupported fields if a pattern is requested
             // Filters metadata fields if all fields are requested
-            return resolveMappingField(context, field, 1.0f, !allFields, !multiFields, quoted ? quoteFieldSuffix : null);
+            extractedFields = resolveMappingField(context, field, 1.0f, !allFields, !multiFields, quoted ? quoteFieldSuffix : null);
         } else if (quoted && quoteFieldSuffix != null) {
-            return resolveMappingFields(context, fieldsAndWeights, quoteFieldSuffix);
+            extractedFields = resolveMappingFields(context, fieldsAndWeights, quoteFieldSuffix);
         } else {
-            return fieldsAndWeights;
+            extractedFields = fieldsAndWeights;
         }
-    }
-
-    @Override
-    protected Query newTermQuery(Term term) {
-        if (currentFieldType != null) {
-            Query termQuery = currentFieldType.queryStringTermQuery(term);
-            if (termQuery != null) {
-                return termQuery;
-            }
-        }
-        return super.newTermQuery(term);
+        checkForTooManyFields(extractedFields.size(), this.context, field);
+        return extractedFields;
     }
 
     @Override
@@ -408,7 +423,7 @@ public class QueryStringQueryParser extends QueryParser {
             BytesRef part1Binary = part1 == null ? null : normalizer.normalize(field, part1);
             BytesRef part2Binary = part2 == null ? null : normalizer.normalize(field, part2);
             Query rangeQuery = currentFieldType.rangeQuery(part1Binary, part2Binary,
-                startInclusive, endInclusive, null, timeZone, null, context);
+                    startInclusive, endInclusive, null, timeZone, null, context);
             return rangeQuery;
         } catch (RuntimeException e) {
             if (lenient) {
@@ -423,7 +438,8 @@ public class QueryStringQueryParser extends QueryParser {
         if (fuzzySlop.image.length() == 1) {
             return getFuzzyQuery(field, termImage, fuzziness.asDistance(termImage));
         }
-        return getFuzzyQuery(field, termImage, Fuzziness.build(fuzzySlop.image.substring(1)).asFloat());
+        float distance = Fuzziness.build(fuzzySlop.image.substring(1)).asDistance(termImage);
+        return getFuzzyQuery(field, termImage, distance);
     }
 
     @Override
@@ -456,7 +472,7 @@ public class QueryStringQueryParser extends QueryParser {
             Analyzer normalizer = forceAnalyzer == null ? queryBuilder.getContext().getSearchAnalyzer(currentFieldType) : forceAnalyzer;
             BytesRef term = termStr == null ? null : normalizer.normalize(field, termStr);
             return currentFieldType.fuzzyQuery(term, Fuzziness.fromEdits((int) minSimilarity),
-                getFuzzyPrefixLength(), fuzzyMaxExpansions, fuzzyTranspositions);
+                    getFuzzyPrefixLength(), fuzzyMaxExpansions, fuzzyTranspositions, context);
         } catch (RuntimeException e) {
             if (lenient) {
                 return newLenientFieldQuery(field, e);
@@ -469,7 +485,7 @@ public class QueryStringQueryParser extends QueryParser {
     protected Query newFuzzyQuery(Term term, float minimumSimilarity, int prefixLength) {
         int numEdits = Fuzziness.build(minimumSimilarity).asDistance(term.text());
         FuzzyQuery query = new FuzzyQuery(term, numEdits, prefixLength,
-            fuzzyMaxExpansions, fuzzyTranspositions);
+                fuzzyMaxExpansions, fuzzyTranspositions);
         QueryParsers.setRewriteMethod(query, fuzzyRewriteMethod);
         return query;
     }
@@ -506,7 +522,7 @@ public class QueryStringQueryParser extends QueryParser {
             }
             setAnalyzer(forceAnalyzer == null ? queryBuilder.getContext().getSearchAnalyzer(currentFieldType) : forceAnalyzer);
             Query query = null;
-            if (currentFieldType instanceof StringFieldType == false) {
+            if (currentFieldType.tokenized() == false) {
                 query = currentFieldType.prefixQuery(termStr, getMultiTermRewriteMethod(), context);
             } else {
                 query = getPossiblyAnalyzedPrefixQuery(currentFieldType.name(), termStr);
@@ -524,7 +540,8 @@ public class QueryStringQueryParser extends QueryParser {
 
     private Query getPossiblyAnalyzedPrefixQuery(String field, String termStr) throws ParseException {
         if (analyzeWildcard == false) {
-            return super.getPrefixQuery(field, termStr);
+            return currentFieldType.prefixQuery(getAnalyzer().normalize(field, termStr).utf8ToString(),
+                    getMultiTermRewriteMethod(), context);
         }
         List<List<String> > tlist;
         // get Analyzer from superclass and tokenize the term
@@ -567,7 +584,7 @@ public class QueryStringQueryParser extends QueryParser {
         }
 
         if (tlist.size() == 1 && tlist.get(0).size() == 1) {
-            return super.getPrefixQuery(field, tlist.get(0).get(0));
+            return currentFieldType.prefixQuery(tlist.get(0).get(0), getMultiTermRewriteMethod(), context);
         }
 
         // build a boolean query with prefix on the last position only.
@@ -578,9 +595,9 @@ public class QueryStringQueryParser extends QueryParser {
             Query posQuery;
             if (plist.size() == 1) {
                 if (isLastPos) {
-                    posQuery = super.getPrefixQuery(field, plist.get(0));
+                    posQuery = currentFieldType.prefixQuery(plist.get(0), getMultiTermRewriteMethod(), context);
                 } else {
-                    posQuery = newTermQuery(new Term(field, plist.get(0)));
+                    posQuery = newTermQuery(new Term(field, plist.get(0)), BoostAttribute.DEFAULT_BOOST);
                 }
             } else if (isLastPos == false) {
                 // build a synonym query for terms in the same position.
@@ -593,19 +610,19 @@ public class QueryStringQueryParser extends QueryParser {
                 List<BooleanClause> innerClauses = new ArrayList<>();
                 for (String token : plist) {
                     innerClauses.add(new BooleanClause(super.getPrefixQuery(field, token),
-                        BooleanClause.Occur.SHOULD));
+                            BooleanClause.Occur.SHOULD));
                 }
                 posQuery = getBooleanQuery(innerClauses);
             }
             clauses.add(new BooleanClause(posQuery,
-                getDefaultOperator() == Operator.AND ? BooleanClause.Occur.MUST : BooleanClause.Occur.SHOULD));
+                    getDefaultOperator() == Operator.AND ? BooleanClause.Occur.MUST : BooleanClause.Occur.SHOULD));
         }
         return getBooleanQuery(clauses);
     }
 
     private Query existsQuery(String fieldName) {
         final FieldNamesFieldMapper.FieldNamesFieldType fieldNamesFieldType =
-            (FieldNamesFieldMapper.FieldNamesFieldType) context.getMapperService().fullName(FieldNamesFieldMapper.NAME);
+                (FieldNamesFieldMapper.FieldNamesFieldType) context.getMapperService().fieldType(FieldNamesFieldMapper.NAME);
         if (fieldNamesFieldType == null) {
             return new MatchNoDocsQuery("No mappings yet");
         }
@@ -621,11 +638,7 @@ public class QueryStringQueryParser extends QueryParser {
     protected Query getWildcardQuery(String field, String termStr) throws ParseException {
         String actualField = field != null ? field : this.field;
         if (termStr.equals("*") && actualField != null) {
-            /**
-             * We rewrite _all:* to a match all query.
-             * TODO: We can remove this special case when _all is completely removed.
-             */
-            if (Regex.isMatchAllPattern(actualField) || AllFieldMapper.NAME.equals(actualField)) {
+            if (Regex.isMatchAllPattern(actualField)) {
                 return newMatchAllDocsQuery();
             }
             // effectively, we check if a field exists or not
@@ -682,9 +695,9 @@ public class QueryStringQueryParser extends QueryParser {
         final int maxAllowedRegexLength = context.getIndexSettings().getMaxRegexLength();
         if (termStr.length() > maxAllowedRegexLength) {
             throw new IllegalArgumentException(
-                "The length of regex ["  + termStr.length() +  "] used in the [query_string] has exceeded " +
-                    "the allowed maximum of [" + maxAllowedRegexLength + "]. This maximum can be set by changing the [" +
-                    IndexSettings.MAX_REGEX_LENGTH_SETTING.getKey() + "] index level setting.");
+                    "The length of regex ["  + termStr.length() +  "] used in the [query_string] has exceeded " +
+                            "the allowed maximum of [" + maxAllowedRegexLength + "]. This maximum can be set by changing the [" +
+                            IndexSettings.MAX_REGEX_LENGTH_SETTING.getKey() + "] index level setting.");
         }
         Map<String, Float> fields = extractMultiFields(field, false);
         if (fields.isEmpty()) {
@@ -753,7 +766,7 @@ public class QueryStringQueryParser extends QueryParser {
     private Query addSlopToSpan(SpanQuery query, int slop) {
         if (query instanceof SpanNearQuery) {
             return new SpanNearQuery(((SpanNearQuery) query).getClauses(), slop,
-                ((SpanNearQuery) query).isInOrder());
+                    ((SpanNearQuery) query).isInOrder());
         } else if (query instanceof SpanOrQuery) {
             SpanQuery[] clauses = new SpanQuery[((SpanOrQuery) query).getClauses().length];
             int pos = 0;
