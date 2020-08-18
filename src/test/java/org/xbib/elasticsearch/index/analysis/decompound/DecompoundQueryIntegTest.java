@@ -366,7 +366,39 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
         ElasticsearchAssertions.assertHitCount(resp, 0L);
     }
-    
+
+    public void testBoostedTermQueryWithRange() throws Exception {
+
+        List<IndexRequestBuilder> reqs = new ArrayList<>();
+        reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "2020-05-01 2020-06-01 2020-07-1"));
+        indexRandom(true, false, reqs);
+
+        GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("text:>=2020-06-01");
+        Map<String, Float> fields = new HashMap<>();
+        fields.put("text", 2.0f);
+        fields.put("text2", 1.0f);
+        //geniosQueryStringQueryBuilder.fields(fields);
+        ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false, 100.0F);
+        SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
+        ElasticsearchAssertions.assertHitCount(resp, 0L);
+    }
+
+    public void testBoostedTermQueryWithDateRange() throws Exception {
+
+        List<IndexRequestBuilder> reqs = new ArrayList<>();
+        reqs.add(client().prepareIndex("test", "_doc", "1").setSource("date", "2020-05-01"));
+        indexRandom(true, false, reqs);
+
+        GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("date:>=2020-06-01");
+        Map<String, Float> fields = new HashMap<>();
+        fields.put("text", 2.0f);
+        fields.put("text2", 1.0f);
+        //geniosQueryStringQueryBuilder.fields(fields);
+        ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false, 100.0F);
+        SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
+        ElasticsearchAssertions.assertHitCount(resp, 0L);
+    }
+
     public void testGermanQuerySyntax() throws Exception {
 
         List<IndexRequestBuilder> reqs = new ArrayList<>();
