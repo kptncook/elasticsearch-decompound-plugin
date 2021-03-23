@@ -117,11 +117,11 @@ public final class QueryParserHelper {
         Map<String, Float> fields = new HashMap<>();
 
         for (String fieldName : allFields) {
-            if (fieldSuffix != null && context.fieldMapper(fieldName + fieldSuffix) != null) {
+            if (fieldSuffix != null && context.getFieldType(fieldName + fieldSuffix) != null) {
                 fieldName = fieldName + fieldSuffix;
             }
 
-            MappedFieldType fieldType = context.getMapperService().fieldType(fieldName);
+            MappedFieldType fieldType = context.getFieldType(fieldName);
             if (fieldType == null) {
                 continue;
             }

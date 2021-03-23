@@ -16,8 +16,8 @@ public class ExactMinFrequencyPrefixQueryHandler implements QueryHandler {
 	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		final MinFrequencyPrefixQuery multiTermQuery = (MinFrequencyPrefixQuery) query;
-		MappedFieldType fieldType = context.fieldMapper(multiTermQuery.getField());
-		if (fieldType != null && fieldType.tokenized()) {
+		MappedFieldType fieldType = context.getFieldType(multiTermQuery.getField());
+		if (fieldType != null && fieldType.getTextSearchInfo().isTokenized()) {
 			return new SpanMinFrequencyFilterQuery(
 					new SpanEmptyPayloadCheckQuery(new SpanMultiTermQueryWrapper<MultiTermQuery>(multiTermQuery)),
 					multiTermQuery.getMinFrequency());

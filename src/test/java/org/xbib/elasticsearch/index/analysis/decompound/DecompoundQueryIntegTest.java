@@ -18,8 +18,11 @@ import java.util.Set;
 
 import org.elasticsearch.action.admin.cluster.node.info.NodeInfo;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
+import org.elasticsearch.action.admin.cluster.node.info.PluginsAndModules;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.cluster.ClusterState;
+import org.elasticsearch.action.admin.cluster.node.info.NodesInfoRequest.Metric;
 import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.common.xcontent.ToXContent;
 import org.elasticsearch.common.xcontent.XContent;
@@ -53,12 +56,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
     protected Collection<Class<? extends Plugin>> nodePlugins() {
         return Arrays.asList(Netty4Plugin.class, AnalysisDecompoundPlugin.class);
     }
-    
+
     public void testPluginIsLoaded() {
-        NodesInfoResponse response = client().admin().cluster().prepareNodesInfo().setPlugins(true).get();
+        NodesInfoResponse response = client().admin().cluster().prepareNodesInfo().get();
         for (NodeInfo nodeInfo : response.getNodes()) {
             boolean pluginFound = false;
-            for (PluginInfo pluginInfo : nodeInfo.getPlugins().getPluginInfos()) {
+            for (PluginInfo pluginInfo : nodeInfo.getInfo(PluginsAndModules.class).getPluginInfos()) {
                 if (pluginInfo.getName().equals(AnalysisDecompoundPlugin.class.getName())) {
                     pluginFound = true;
                     break;
@@ -99,12 +102,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         assertHits(resp.getHits(), "2", "1");
 
     }
-   
+
     public void testNestedCommonPhraseQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-       
+
         QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:\"deutsche spielbankgesellschaft\"");
         ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(queryStringQueryBuilder, false);
         SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
@@ -122,13 +125,13 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         ElasticsearchAssertions.assertHitCount(resp3, 1L);
         assertHits(resp3.getHits(), "1");
     }
-    
-    
+
+
     public void testAllQueryTypesExactQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-      
+
         {
 			QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:bank");
 			ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(queryStringQueryBuilder, true);
@@ -160,12 +163,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
 			ElasticsearchAssertions.assertHitCount(resp, 0L);
         }
     }
-    
+
     public void testMinFrequencyExactQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft als Bank"));
         indexRandom(true, false, reqs);
-       
+
         {
         	SearchSourceBuilder sourceBuilder = getFromSource("/minFrequencyTerm.json", "bank", 2, false);
 			SearchResponse resp = client().prepareSearch("test").setSource(sourceBuilder).get();
@@ -227,7 +230,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-       
+
         QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:\"deutsche bank\"");
         SearchResponse resp = client().prepareSearch("test").setQuery(queryStringQueryBuilder).get();
         ElasticsearchAssertions.assertHitCount(resp, 1L);
@@ -340,7 +343,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
     }
 
     public void testKeywordOneTermQuery() throws Exception {
-    	
+
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("keyword", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
@@ -350,9 +353,9 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         ElasticsearchAssertions.assertHitCount(resp, 1L);
         assertHits(resp.getHits(), "1");
     }
-    
+
     public void testBoostedTermQuery() throws Exception {
-    	
+
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "spielbankgesellschaft", "text2", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
@@ -420,7 +423,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
 			SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
 			ElasticsearchAssertions.assertHitCount(resp, 3L);
         }
-    	
+
         {
 			GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("bank NICHT spiel");
 			ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false);
@@ -443,25 +446,25 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("keyword", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-        
+
         String queryJson = StreamsUtils.copyToStringFromClasspath("/complex_query.json");
         final XContent xContent = XContentFactory.xContent(XContentType.JSON);
         XContentParser xContentParser = xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, queryJson);
         QueryBuilder queryBuilder = AbstractQueryBuilder.parseInnerQueryBuilder(xContentParser);
-       
+
         final XContent xContentNew = XContentFactory.xContent(XContentType.JSON);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         XContentBuilder xContentBuilder = new XContentBuilder(xContentNew, baos);
         queryBuilder.toXContent(xContentBuilder, ToXContent.EMPTY_PARAMS);
         xContentBuilder.close();
         baos.close();
-        
+
         byte[] byteArray = baos.toByteArray();
         final XContent xContentCompare = XContentFactory.xContent(XContentType.JSON);
         XContentParser xContentParserCompare = xContentCompare.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, byteArray);
         QueryBuilder queryBuilderCompare = AbstractQueryBuilder.parseInnerQueryBuilder(xContentParserCompare);
         assertEquals(queryBuilder, queryBuilderCompare);
-        
-    	
+
+
     }
 }

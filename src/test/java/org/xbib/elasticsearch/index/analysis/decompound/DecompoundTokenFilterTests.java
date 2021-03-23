@@ -7,7 +7,7 @@ import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.analysis.Tokenizer;
 import org.apache.lucene.analysis.tokenattributes.CharTermAttribute;
 import org.elasticsearch.Version;
-import org.elasticsearch.cluster.metadata.IndexMetaData;
+import org.elasticsearch.cluster.metadata.IndexMetadata;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.analysis.NamedAnalyzer;
@@ -51,10 +51,10 @@ public class DecompoundTokenFilterTests extends ESTestCase {
         };
         String resource = "decompound_analysis.json";
         Settings settings = Settings.builder()
-                .put(IndexMetaData.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
                 .loadFromStream(resource, ClassLoader.getSystemClassLoader().getResourceAsStream(resource), false)
                 .build();
-        IndexMetaData indexMetaData = IndexMetaData.builder("test")
+        IndexMetadata indexMetaData = IndexMetadata.builder("test")
                 .settings(settings)
                 .numberOfShards(1)
                 .numberOfReplicas(1)
@@ -84,10 +84,10 @@ public class DecompoundTokenFilterTests extends ESTestCase {
         };
         String resource = "decompound_analysis.json";
         Settings settings = Settings.builder()
-                .put(IndexMetaData.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
                 .loadFromStream(resource, ClassLoader.getSystemClassLoader().getResourceAsStream(resource), false)
                 .build();
-        IndexMetaData indexMetaData = IndexMetaData.builder("test")
+        IndexMetadata indexMetaData = IndexMetadata.builder("test")
                 .settings(settings)
                 .numberOfShards(1)
                 .numberOfReplicas(1)
@@ -118,11 +118,11 @@ public class DecompoundTokenFilterTests extends ESTestCase {
         };
         String resource = "keywords_analysis.json";
         Settings settings = Settings.builder()
-                .put(IndexMetaData.SETTING_VERSION_CREATED, Version.CURRENT)
+                .put(IndexMetadata.SETTING_VERSION_CREATED, Version.CURRENT)
                 .put("path.home", System.getProperty("path.home", "/tmp"))
                 .loadFromStream(resource, ClassLoader.getSystemClassLoader().getResourceAsStream(resource), false)
                 .build();
-        IndexMetaData indexMetaData = IndexMetaData.builder("test")
+        IndexMetadata indexMetaData = IndexMetadata.builder("test")
                 .settings(settings)
                 .numberOfShards(1)
                 .numberOfReplicas(1)

@@ -23,8 +23,8 @@ public class TransformTermQueryToMinFrequencyTermQueryHandler implements QueryHa
 							 final Query query, QueryTraverser queryTraverser) {
 		final TermQuery termQuery = (TermQuery) query;
 
-		MappedFieldType fieldType = context.fieldMapper(termQuery.getTerm().field());
-		if (fieldType != null && fieldType.tokenized()) {
+		MappedFieldType fieldType = context.getFieldType(termQuery.getTerm().field());
+		if (fieldType != null && fieldType.getTextSearchInfo().isTokenized()) {
 			return new SpanMinFrequencyFilterQuery(new SpanEmptyPayloadCheckQuery(new SpanTermQuery(termQuery.getTerm())), minFrequency);
 		}
 		return new MinFrequencyTermQuery(termQuery.getTerm(), minFrequency);

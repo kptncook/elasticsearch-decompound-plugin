@@ -18,8 +18,8 @@ public class MarkTermQueryHandler implements QueryHandler {
 	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		final TermQuery termQuery = (TermQuery) query;
-		MappedFieldType fieldType = context.fieldMapper(termQuery.getTerm().field());
-		if (fieldType != null && fieldType.tokenized()) {
+		MappedFieldType fieldType = context.getFieldType(termQuery.getTerm().field());
+		if (fieldType != null && fieldType.getTextSearchInfo().isTokenized()) {
 			return new MarkedTermQuery(termQuery.getTerm(), this.context);
 		}
 		return termQuery;

@@ -21,8 +21,8 @@ public class ExactMarkedTermQueryHandler implements QueryHandler {
 							 final Query query, QueryTraverser queryTraverser) {
 		final MarkedTermQuery termQuery = (MarkedTermQuery) query;
 		if (termQuery.getContext() == this.context) {
-			MappedFieldType fieldType = context.fieldMapper(termQuery.getTerm().field());
-			if (fieldType != null && fieldType.tokenized()) {
+			MappedFieldType fieldType = context.getFieldType(termQuery.getTerm().field());
+			if (fieldType != null && fieldType.getTextSearchInfo().isTokenized()) {
 				return new SpanEmptyPayloadCheckQuery(new SpanTermQuery(termQuery.getTerm()));
 			}
 		}
