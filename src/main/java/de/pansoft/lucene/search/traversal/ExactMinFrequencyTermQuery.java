@@ -3,7 +3,7 @@ package de.pansoft.lucene.search.traversal;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.spans.SpanTermQuery;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import de.pansoft.lucene.index.query.frequency.MinFrequencyTermQuery;
 import de.pansoft.lucene.search.spans.SpanEmptyPayloadCheckQuery;
@@ -12,7 +12,7 @@ import de.pansoft.lucene.search.spans.SpanMinFrequencyFilterQuery;
 public class ExactMinFrequencyTermQuery implements QueryHandler {
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, SearchExecutionContext context,
 							 Query query, QueryTraverser queryTraverser) {
 		final MinFrequencyTermQuery minFrequencyTermQuery = (MinFrequencyTermQuery) query;
 		MappedFieldType fieldType = context.getFieldType(minFrequencyTermQuery.getTerm().field());
@@ -23,7 +23,7 @@ public class ExactMinFrequencyTermQuery implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, QueryShardContext context,
+	public boolean acceptQuery(final TraverserContext traverserContext, SearchExecutionContext context,
 							   Query query) {
 		return query != null && query instanceof MinFrequencyTermQuery;
 	}

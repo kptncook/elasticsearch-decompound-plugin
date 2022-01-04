@@ -1,20 +1,9 @@
 /*
- * Licensed to Elasticsearch under one or more contributor
- * license agreements. See the NOTICE file distributed with
- * this work for additional information regarding copyright
- * ownership. Elasticsearch licenses this file to you under
- * the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing,
- * software distributed under the License is distributed on an
- * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
- * KIND, either express or implied.  See the License for the
- * specific language governing permissions and limitations
- * under the License.
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0 and the Server Side Public License, v 1; you may not use this file except
+ * in compliance with, at your election, the Elastic License 2.0 or the Server
+ * Side Public License, v 1.
  */
 
 package de.pansoft.elasticsearch.index.search;
@@ -23,6 +12,7 @@ import org.apache.lucene.analysis.Analyzer;
 import org.apache.lucene.analysis.TokenStream;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.BlendedTermQuery;
+import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.MatchNoDocsQuery;
@@ -32,8 +22,8 @@ import org.apache.lucene.util.BytesRef;
 import org.elasticsearch.common.lucene.search.Queries;
 import org.elasticsearch.index.mapper.MappedFieldType;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
-import org.elasticsearch.index.query.MultiMatchQueryBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
+import de.pansoft.elasticsearch.index.query.MultiMatchQueryBuilder;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -45,11 +35,11 @@ import java.util.Objects;
 
 import static org.elasticsearch.common.lucene.search.Queries.newLenientFieldQuery;
 
-public class MultiMatchQuery extends MatchQuery {
+public class MultiMatchQueryParser extends MatchQueryParser {
 
     private Float groupTieBreaker = null;
 
-    public MultiMatchQuery(QueryShardContext context) {
+    public MultiMatchQueryParser(SearchExecutionContext context) {
         super(context);
     }
 
@@ -77,7 +67,7 @@ public class MultiMatchQuery extends MatchQuery {
                 break;
 
             case CROSS_FIELDS:
-                queries = buildCrossFieldQuery(type, fieldNames, value, minimumShouldMatch, tieBreaker);
+                queries = buildCrossFieldQuery(fieldNames, value, minimumShouldMatch, tieBreaker);
                 break;
 
             default:
@@ -88,7 +78,7 @@ public class MultiMatchQuery extends MatchQuery {
 
     private Query combineGrouped(List<Query> groupQuery, float tieBreaker) {
         if (groupQuery.isEmpty()) {
-            return zeroTermsQuery();
+            return zeroTermsQuery.asQuery();
         }
         if (groupQuery.size() == 1) {
             return groupQuery.get(0);
@@ -119,16 +109,17 @@ public class MultiMatchQuery extends MatchQuery {
         return queries;
     }
 
-    private List<Query> buildCrossFieldQuery(MultiMatchQueryBuilder.Type type, Map<String, Float> fieldNames,
-                                             Object value, String minimumShouldMatch, float tieBreaker) throws IOException {
+    private List<Query> buildCrossFieldQuery(Map<String, Float> fieldNames,
+                                             Object value, String minimumShouldMatch, float tieBreaker) {
+
         Map<Analyzer, List<FieldAndBoost>> groups = new HashMap<>();
         List<Query> queries = new ArrayList<>();
         for (Map.Entry<String, Float> entry : fieldNames.entrySet()) {
             String name = entry.getKey();
             MappedFieldType fieldType = context.getFieldType(name);
             if (fieldType != null) {
-                Analyzer actualAnalyzer = getAnalyzer(fieldType, type == MultiMatchQueryBuilder.Type.PHRASE);
-                if (!groups.containsKey(actualAnalyzer)) {
+                Analyzer actualAnalyzer = getAnalyzer(fieldType, false);
+                if (groups.containsKey(actualAnalyzer) == false) {
                     groups.put(actualAnalyzer, new ArrayList<>());
                 }
                 float boost = entry.getValue() == null ? 1.0f : entry.getValue();
@@ -141,7 +132,7 @@ public class MultiMatchQuery extends MatchQuery {
                 builder = new MatchQueryBuilder(group.getKey(), group.getValue().get(0).fieldType,
                         enablePositionIncrements, autoGenerateSynonymsPhraseQuery);
             } else {
-                builder = new BlendedQueryBuilder(group.getKey(), group.getValue(), tieBreaker,
+                builder = new CrossFieldsQueryBuilder(group.getKey(), group.getValue(), tieBreaker,
                         enablePositionIncrements, autoGenerateSynonymsPhraseQuery);
             }
 
@@ -151,7 +142,11 @@ public class MultiMatchQuery extends MatchQuery {
              * fields are already grouped by their analyzers/types.
              */
             String representativeField = group.getValue().get(0).fieldType.name();
-            Query query = parseInternal(type.matchQueryType(), representativeField, builder, value);
+            Query query = builder.createBooleanQuery(representativeField, value.toString(), occur);
+            if (query == null) {
+                query = zeroTermsQuery.asQuery();
+            }
+
             query = Queries.maybeApplyMinimumShouldMatch(query, minimumShouldMatch);
             if (query != null) {
                 if (group.getValue().size() == 1) {
@@ -168,15 +163,30 @@ public class MultiMatchQuery extends MatchQuery {
         return queries;
     }
 
-    private class BlendedQueryBuilder extends MatchQueryBuilder {
+    private class CrossFieldsQueryBuilder extends MatchQueryBuilder {
         private final List<FieldAndBoost> blendedFields;
         private final float tieBreaker;
 
-        BlendedQueryBuilder(Analyzer analyzer, List<FieldAndBoost> blendedFields, float tieBreaker,
-                            boolean enablePositionIncrements, boolean autoGenerateSynonymsPhraseQuery) {
+        CrossFieldsQueryBuilder(Analyzer analyzer, List<FieldAndBoost> blendedFields, float tieBreaker,
+                                boolean enablePositionIncrements, boolean autoGenerateSynonymsPhraseQuery) {
             super(analyzer, blendedFields.get(0).fieldType, enablePositionIncrements, autoGenerateSynonymsPhraseQuery);
             this.blendedFields = blendedFields;
             this.tieBreaker = tieBreaker;
+        }
+
+        @Override
+        public Query createPhraseQuery(String field, String queryText, int phraseSlop) {
+            throw new IllegalArgumentException("[multi_match] queries in [cross_fields] mode don't support phrases");
+        }
+
+        @Override
+        protected Query createPhrasePrefixQuery(String field, String queryText, int slop) {
+            throw new IllegalArgumentException("[multi_match] queries in [cross_fields] mode don't support phrase prefix");
+        }
+
+        @Override
+        protected Query createBooleanPrefixQuery(String field, String queryText, BooleanClause.Occur occur) {
+            throw new IllegalArgumentException("[multi_match] queries in [cross_fields] mode don't support boolean prefix");
         }
 
         @Override
@@ -195,22 +205,14 @@ public class MultiMatchQuery extends MatchQuery {
 
         @Override
         protected Query newPrefixQuery(Term term) {
-            List<Query> disjunctions = new ArrayList<>();
-            for (FieldAndBoost fieldType : blendedFields) {
-                Query query = fieldType.fieldType.prefixQuery(term.text(), null, context);
-                if (fieldType.boost != 1f) {
-                    query = new BoostQuery(query, fieldType.boost);
-                }
-                disjunctions.add(query);
-            }
-            return new DisjunctionMaxQuery(disjunctions, tieBreaker);
+            throw new IllegalArgumentException("[multi_match] queries in [cross_fields] mode don't support prefix");
         }
 
         @Override
         protected Query analyzePhrase(String field, TokenStream stream, int slop) throws IOException {
             List<Query> disjunctions = new ArrayList<>();
             for (FieldAndBoost fieldType : blendedFields) {
-                Query query = fieldType.fieldType.phraseQuery(stream, slop, enablePositionIncrements);
+                Query query = fieldType.fieldType.phraseQuery(stream, slop, enablePositionIncrements, context);
                 if (fieldType.boost != 1f) {
                     query = new BoostQuery(query, fieldType.boost);
                 }
@@ -223,7 +225,7 @@ public class MultiMatchQuery extends MatchQuery {
         protected Query analyzeMultiPhrase(String field, TokenStream stream, int slop) throws IOException {
             List<Query> disjunctions = new ArrayList<>();
             for (FieldAndBoost fieldType : blendedFields) {
-                Query query = fieldType.fieldType.multiPhraseQuery(stream, slop, enablePositionIncrements);
+                Query query = fieldType.fieldType.multiPhraseQuery(stream, slop, enablePositionIncrements, context);
                 if (fieldType.boost != 1f) {
                     query = new BoostQuery(query, fieldType.boost);
                 }
@@ -233,13 +235,13 @@ public class MultiMatchQuery extends MatchQuery {
         }
     }
 
-    static Query blendTerm(QueryShardContext context, BytesRef value, Float commonTermsCutoff, float tieBreaker,
+    static Query blendTerm(SearchExecutionContext context, BytesRef value, Float commonTermsCutoff, float tieBreaker,
                            boolean lenient, List<FieldAndBoost> blendedFields) {
 
         return blendTerms(context, new BytesRef[] {value}, commonTermsCutoff, tieBreaker, lenient, blendedFields);
     }
 
-    static Query blendTerms(QueryShardContext context, BytesRef[] values, Float commonTermsCutoff, float tieBreaker,
+    static Query blendTerms(SearchExecutionContext context, BytesRef[] values, Float commonTermsCutoff, float tieBreaker,
                             boolean lenient, List<FieldAndBoost> blendedFields) {
 
         List<Query> queries = new ArrayList<>();
@@ -304,17 +306,4 @@ public class MultiMatchQuery extends MatchQuery {
             this.boost = boost;
         }
     }
-
-    Analyzer getAnalyzer() {
-        return this.analyzer;
-    }
-
-    int getPhraseSlop() {
-        return this.phraseSlop;
-    }
-
-    QueryShardContext getContext() {
-        return this.context;
-    }
 }
-

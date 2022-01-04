@@ -5,7 +5,7 @@ import de.pansoft.lucene.index.query.frequency.MinFrequencyTermQuery;
 import org.apache.lucene.search.PrefixQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class TransformPrefixQueryToMinFrequencyPrefixQueryHandler implements QueryHandler {
 
@@ -16,14 +16,14 @@ public class TransformPrefixQueryToMinFrequencyPrefixQueryHandler implements Que
 	}
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		final PrefixQuery prefixQuery = (PrefixQuery) query;
 		return new MinFrequencyPrefixQuery(prefixQuery.getPrefix(), minFrequency);
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							   Query query) {
 		return query != null && query instanceof PrefixQuery;
 	}

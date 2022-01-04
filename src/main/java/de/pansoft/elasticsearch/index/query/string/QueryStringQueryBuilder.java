@@ -24,7 +24,7 @@ import org.apache.lucene.search.FuzzyQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.automaton.Operations;
 import org.elasticsearch.Version;
-import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.xcontent.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -35,10 +35,11 @@ import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.analysis.NamedAnalyzer;
+import de.pansoft.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.*;
 import org.elasticsearch.index.query.support.QueryParsers;
-import org.elasticsearch.index.search.QueryParserHelper;
-import org.elasticsearch.index.search.QueryStringQueryParser;
+import de.pansoft.elasticsearch.index.search.QueryParserHelper;
+import de.pansoft.elasticsearch.index.search.QueryStringQueryParser;
 
 import java.io.IOException;
 import java.time.ZoneId;
@@ -837,7 +838,7 @@ public class QueryStringQueryBuilder extends AbstractQueryBuilder<QueryStringQue
     }
 
     @Override
-    protected Query doToQuery(QueryShardContext context) throws IOException {
+    protected Query doToQuery(SearchExecutionContext context) throws IOException {
         String rewrittenQueryString = escape ? org.apache.lucene.queryparser.classic.QueryParser.escape(this.queryString) : queryString;
         if (fieldsAndWeights.size() > 0 && this.defaultField != null) {
             throw addValidationError("cannot use [fields] parameter in conjunction with [default_field]", null);

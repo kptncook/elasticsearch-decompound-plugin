@@ -8,7 +8,7 @@ import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.util.BytesRef;
-import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.xcontent.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.io.stream.StreamOutput;
@@ -16,7 +16,7 @@ import org.elasticsearch.common.lucene.BytesRefs;
 import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import de.pansoft.lucene.index.query.frequency.MinFrequencyTermQuery;
 
@@ -126,7 +126,7 @@ public class MinFrequencyTermQueryBuilder extends AbstractQueryBuilder<MinFreque
 	}
 
 	@Override
-	protected Query doToQuery(QueryShardContext context) throws IOException {
+	protected Query doToQuery(SearchExecutionContext context) throws IOException {
 		Query query = new MinFrequencyTermQuery(new Term(this.fieldName, BytesRefs.toBytesRef(this.value)),
 				minFrequency);
 		if (boost() != AbstractQueryBuilder.DEFAULT_BOOST) {

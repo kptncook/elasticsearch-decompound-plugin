@@ -1,7 +1,7 @@
 package de.pansoft.lucene.search.traversal;
 
 import org.apache.lucene.search.Query;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class QueryTraverser {
 
@@ -19,7 +19,7 @@ public class QueryTraverser {
 		return new QueryTraverser(queryHandlers);
 	}
 
-	public Query traverse(final TraverserContext traverserContext, final QueryShardContext context, final Query query) {
+	public Query traverse(final TraverserContext traverserContext, final SearchExecutionContext context, final Query query) {
 		for (QueryHandler queryHandler : queryHandlers) {
 			if (queryHandler.acceptQuery(traverserContext, context, query)) {
 				return queryHandler.handleQuery(traverserContext, context, query, this);

@@ -2,12 +2,12 @@ package de.pansoft.lucene.search.traversal;
 
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class CloneOnChangeConstantScoreQueryHandler implements QueryHandler {
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, final QueryTraverser queryTraverser) {
 		final ConstantScoreQuery constantScoreQuery = (ConstantScoreQuery) query;
 		final Query newInnerConstantScoreQuery = queryTraverser.traverse(traverserContext,
@@ -19,6 +19,6 @@ public class CloneOnChangeConstantScoreQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context, Query query) {
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context, Query query) {
 		return query != null && query instanceof ConstantScoreQuery;
 	}}

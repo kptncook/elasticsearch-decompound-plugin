@@ -6,7 +6,7 @@ import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.apache.lucene.search.spans.SpanTermQuery;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext ;
 
 public class ExactMarkedTermQueryHandler implements QueryHandler {
 
@@ -17,7 +17,7 @@ public class ExactMarkedTermQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		final MarkedTermQuery termQuery = (MarkedTermQuery) query;
 		if (termQuery.getContext() == this.context) {
@@ -30,7 +30,7 @@ public class ExactMarkedTermQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context, Query query) {
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context, Query query) {
 		return query != null && query instanceof MarkedTermQuery;
 	}
 

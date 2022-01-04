@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.xcontent.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.io.stream.StreamInput;
@@ -16,7 +16,7 @@ import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
 import org.elasticsearch.index.query.MultiTermQueryBuilder;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import de.pansoft.lucene.index.query.frequency.MinFrequencyPrefixQuery;
 
@@ -139,7 +139,7 @@ public class MinFrequencyPrefixQueryBuilder  extends AbstractQueryBuilder<MinFre
     }
 
     @Override
-    protected Query doToQuery(QueryShardContext context) throws IOException {
+    protected Query doToQuery(SearchExecutionContext context) throws IOException {
         Query query = new MinFrequencyPrefixQuery(new Term(fieldName, BytesRefs.toBytesRef(value)), minFrequency);
 		if (boost() != AbstractQueryBuilder.DEFAULT_BOOST) {
 			query = new BoostQuery(query, boost());

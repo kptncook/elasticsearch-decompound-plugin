@@ -11,7 +11,7 @@ import java.util.Map;
 import org.apache.lucene.search.BoostQuery;
 import org.apache.lucene.search.Query;
 import org.elasticsearch.Version;
-import org.elasticsearch.common.ParseField;
+import org.elasticsearch.common.xcontent.ParseField;
 import org.elasticsearch.common.ParsingException;
 import org.elasticsearch.common.io.stream.StreamInput;
 import org.elasticsearch.common.lucene.search.Queries;
@@ -23,12 +23,12 @@ import org.elasticsearch.common.xcontent.XContentParser;
 import org.elasticsearch.index.analysis.NamedAnalyzer;
 import org.elasticsearch.index.mapper.AllFieldMapper;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
-import org.elasticsearch.index.query.MultiMatchQueryBuilder;
+import de.pansoft.elasticsearch.index.query.MultiMatchQueryBuilder;
 import org.elasticsearch.index.query.Operator;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 import org.elasticsearch.index.query.QueryShardException;
 import org.elasticsearch.index.query.support.QueryParsers;
-import org.elasticsearch.index.search.QueryParserHelper;
+import de.pansoft.elasticsearch.index.search.QueryParserHelper;
 
 public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
 	
@@ -292,7 +292,7 @@ public class GeniosQueryStringQueryBuilder extends QueryStringQueryBuilder {
     }
     
     @Override
-    protected Query doToQuery(QueryShardContext context) throws IOException {
+    protected Query doToQuery(SearchExecutionContext context) throws IOException {
         String rewrittenQueryString = escape() ? org.apache.lucene.queryparser.classic.QueryParser.escape(this.queryString()) : queryString();
         if (fields().size() > 0 && this.defaultField() != null) {
             throw addValidationError("cannot use [fields] parameter in conjunction with [default_field]", null);
