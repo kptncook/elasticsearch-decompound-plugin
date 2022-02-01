@@ -137,11 +137,11 @@ clean {
     delete "logs"
 }
 
-task javadocJar(type: Jar, dependsOn: classes) {
-    from javadoc
-    into 'build/tmp'
-    classifier 'javadoc'
-}
+//task javadocJar(type: Jar, dependsOn: classes) {
+//    from javadoc
+//    into 'build/tmp'
+//    classifier 'javadoc'
+//}
 
 task sourcesJar(type: Jar, dependsOn: classes) {
     from sourceSets.main.allSource
@@ -150,7 +150,7 @@ task sourcesJar(type: Jar, dependsOn: classes) {
 }
 
 artifacts {
-    archives sourcesJar, javadocJar, buildPluginZip
+    archives sourcesJar, buildPluginZip
 }
 
 if (project.hasProperty('signing.keyId')) {
@@ -158,3 +158,5 @@ if (project.hasProperty('signing.keyId')) {
         sign configurations.archives
     }
 }
+
+
