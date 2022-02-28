@@ -1,35 +1,13 @@
 package org.xbib.elasticsearch.index.analysis.decompound;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.core.Is.is;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import de.pansoft.elasticsearch.index.query.exact.ExactPhraseQueryBuilder;
+import de.pansoft.elasticsearch.index.query.string.GeniosQueryStringQueryBuilder;
 import org.elasticsearch.action.admin.cluster.node.info.NodeInfo;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
 import org.elasticsearch.action.admin.cluster.node.info.PluginsAndModules;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.cluster.ClusterState;
-import org.elasticsearch.action.admin.cluster.node.info.NodesInfoRequest.Metric;
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
-import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.common.xcontent.XContent;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.common.xcontent.*;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
@@ -42,12 +20,19 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.StreamsUtils;
 import org.elasticsearch.test.hamcrest.ElasticsearchAssertions;
-//import org.elasticsearch.test.junit.annotations.TestLogging;
 import org.elasticsearch.transport.Netty4Plugin;
+import org.elasticsearch.xcontent.*;
 import org.junit.Before;
-import de.pansoft.elasticsearch.index.query.exact.ExactPhraseQueryBuilder;
-import de.pansoft.elasticsearch.index.query.string.GeniosQueryStringQueryBuilder;
 import org.xbib.elasticsearch.plugin.analysis.decompound.AnalysisDecompoundPlugin;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.*;
+
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.core.Is.is;
 
 //@TestLogging("level:DEBUG")
 public class DecompoundQueryIntegTest extends ESIntegTestCase {

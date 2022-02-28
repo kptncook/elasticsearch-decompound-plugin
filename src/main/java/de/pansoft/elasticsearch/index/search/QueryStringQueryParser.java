@@ -33,6 +33,7 @@ import org.apache.lucene.search.spans.SpanNearQuery;
 import org.apache.lucene.search.spans.SpanOrQuery;
 import org.apache.lucene.search.spans.SpanQuery;
 import org.apache.lucene.util.BytesRef;
+import org.apache.lucene.util.automaton.Operations;
 import org.apache.lucene.util.automaton.RegExp;
 import org.elasticsearch.common.lucene.search.Queries;
 import org.elasticsearch.common.regex.Regex;
@@ -732,7 +733,7 @@ public class QueryStringQueryParser extends QueryParser {
                 setAnalyzer(forceAnalyzer);
                 return super.getRegexpQuery(field, termStr);
             }
-            return currentFieldType.regexpQuery(termStr, RegExp.ALL, 0, getMaxDeterminizedStates(),
+            return currentFieldType.regexpQuery(termStr, RegExp.ALL, 0, Operations.DEFAULT_DETERMINIZE_WORK_LIMIT,
                     getMultiTermRewriteMethod(), context);
         } catch (RuntimeException e) {
             if (lenient) {
