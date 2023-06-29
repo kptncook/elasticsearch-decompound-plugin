@@ -48,6 +48,11 @@ final class MinFrequencyTermScorer extends Scorer {
 		return docScorer.score(postingsEnum.docID(), postingsEnum.freq());
 	}
 
+	@Override
+	public float getMaxScore(int upTo) throws IOException {
+		return Float.POSITIVE_INFINITY;
+	}
+
 	/** Returns a string representation of this <code>TermScorer</code>. */
 	@Override
 	public String toString() {

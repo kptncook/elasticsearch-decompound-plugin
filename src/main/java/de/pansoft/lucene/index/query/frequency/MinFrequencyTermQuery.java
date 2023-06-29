@@ -10,16 +10,10 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
+import org.apache.lucene.index.TermStates;
 import org.apache.lucene.index.TermState;
 import org.apache.lucene.index.TermsEnum;
-import org.apache.lucene.search.CollectionStatistics;
-import org.apache.lucene.search.Explanation;
-import org.apache.lucene.search.IndexSearcher;
-import org.apache.lucene.search.Query;
-import org.apache.lucene.search.Scorer;
-import org.apache.lucene.search.TermStatistics;
-import org.apache.lucene.search.Weight;
+import org.apache.lucene.search.*;
 import org.apache.lucene.search.similarities.Similarity;
 import org.apache.lucene.search.similarities.Similarity.SimScorer;
 
@@ -27,25 +21,25 @@ public class MinFrequencyTermQuery extends Query {
 
 	private final Term term;
 	private final int minFrequency;
-	private final TermContext perReaderTermState;
+	private final TermStates perReaderTermState;
 
 	final class MinFrequencyTermWeight extends Weight {
 		private final Similarity similarity;
-		private final Similarity.SimWeight stats;
-		private final TermContext termStates;
+		private final Similarity.SimScorer stats;
+		private final TermStates termStates;
 
-		public MinFrequencyTermWeight(IndexSearcher searcher, boolean needsScores, float boost, TermContext termStates)
+		public MinFrequencyTermWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost, TermStates termStates)
 				throws IOException {
 			super(MinFrequencyTermQuery.this);
 			this.termStates = Objects.requireNonNull(termStates);
-			this.similarity = searcher.getSimilarity(needsScores);
+			this.similarity = searcher.getSimilarity();
 
 			final CollectionStatistics collectionStats;
 			final TermStatistics termStats;
 			collectionStats = searcher.collectionStatistics(term.field());
 			termStats = searcher.termStatistics(term, termStates);
 
-			this.stats = similarity.computeWeight(boost, collectionStats, termStats);
+			this.stats = similarity.scorer(boost, collectionStats, termStats);
 		}
 
 		@Override
@@ -68,7 +62,7 @@ public class MinFrequencyTermQuery extends Query {
 				return null;
 			}
 			PostingsEnum docs = new MinFrequencyPostingsEnum(termsEnum.postings(null, PostingsEnum.FREQS), MinFrequencyTermQuery.this.minFrequency);
-			return new MinFrequencyTermScorer(this, docs, similarity.simScorer(stats, context));
+			return new MinFrequencyTermScorer(this, docs, this.stats);
 		}
 
 		@Override
@@ -84,7 +78,7 @@ public class MinFrequencyTermQuery extends Query {
 			assert termStates.wasBuiltFor(ReaderUtil.getTopLevelContext(
 					context)) : "The top-reader used to create Weight is not the same as the current reader's top-reader ("
 							+ ReaderUtil.getTopLevelContext(context);
-			final TermState state = termStates.get(context.ord);
+			final TermState state = termStates.get(context);
 			if (state == null) { // term is not present in that reader
 				assert termNotInReader(context.reader(), term) : "no termstate found but term exists in reader term="
 						+ term;
@@ -107,9 +101,9 @@ public class MinFrequencyTermQuery extends Query {
 				int newDoc = scorer.iterator().advance(doc);
 				if (newDoc == doc) {
 					float freq = scorer.freq();
-					SimScorer docScorer = similarity.simScorer(stats, context);
+					SimScorer docScorer = this.stats;
 					Explanation freqExplanation = Explanation.match(freq, "termFreq=" + freq);
-					Explanation scoreExplanation = docScorer.explain(doc, freqExplanation);
+					Explanation scoreExplanation = docScorer.explain(freqExplanation, 1);
 					return Explanation.match(scoreExplanation.getValue(), "weight(" + getQuery() + " in " + doc + ") ["
 							+ similarity.getClass().getSimpleName() + "], result of:", scoreExplanation);
 				}
@@ -124,22 +118,22 @@ public class MinFrequencyTermQuery extends Query {
 		this.perReaderTermState = null;
 	}
 
-	public MinFrequencyTermQuery(Term term, int minFrequency, TermContext perReaderTermState) {
+	public MinFrequencyTermQuery(Term term, int minFrequency, TermStates perReaderTermState) {
 		this.term = term = Objects.requireNonNull(term);
 		this.minFrequency = minFrequency;
 		this.perReaderTermState = Objects.requireNonNull(perReaderTermState);
 	}
 
 	@Override
-	public Weight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
+	public Weight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
 		final IndexReaderContext context = searcher.getTopReaderContext();
-		final TermContext termState;
-		if (perReaderTermState == null || perReaderTermState.wasBuiltFor(context) == false) {
-			termState = TermContext.build(context, term);
+		final TermStates termState;
+		if (perReaderTermState == null || !perReaderTermState.wasBuiltFor(context)) {
+			termState = TermStates.build(context, term, scoreMode.needsScores());
 		} else {
 			termState = this.perReaderTermState;
 		}
-		return new MinFrequencyTermWeight(searcher, needsScores, boost, termState);
+		return new MinFrequencyTermWeight(searcher, scoreMode, boost, termState);
 	}
 
 	@Override

@@ -4,7 +4,7 @@ import de.pansoft.lucene.index.query.term.MarkedTermQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.TermQuery;
 import org.elasticsearch.index.mapper.MappedFieldType;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class LayzTraverserQueryHandler implements QueryHandler {
 
@@ -15,7 +15,7 @@ public class LayzTraverserQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		if (traverserContext.getTraversalPhase() == TraversalPhase.BUILD_PHASE) {
 			return new LazyTraverserQuery(
@@ -28,7 +28,7 @@ public class LayzTraverserQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							   Query query) {
 		if (traverserContext.getTraversalPhase() == TraversalPhase.BUILD_PHASE) {
 		    for (Class<? extends Query> clazz: this.queryClasses) {

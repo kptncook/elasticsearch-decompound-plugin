@@ -11,11 +11,12 @@ import org.apache.lucene.index.LeafReaderContext;
 import org.apache.lucene.index.PostingsEnum;
 import org.apache.lucene.index.ReaderUtil;
 import org.apache.lucene.index.Term;
-import org.apache.lucene.index.TermContext;
+import org.apache.lucene.index.TermStates;
 import org.apache.lucene.index.TermState;
 import org.apache.lucene.index.Terms;
 import org.apache.lucene.index.TermsEnum;
 import org.apache.lucene.search.IndexSearcher;
+import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.spans.SpanQuery;
 import org.apache.lucene.search.spans.SpanTermQuery;
 import org.apache.lucene.search.spans.SpanWeight;
@@ -29,7 +30,7 @@ public class MinFrequencySpanTermQuery extends SpanQuery {
 
   protected final Term term;
   protected final int minFrequency;
-  protected final TermContext termContext;
+  protected final TermStates termContext;
 
   /** Construct a SpanTermQuery matching the named term's spans. */
   public MinFrequencySpanTermQuery(Term term, int minFrequency) {
@@ -40,9 +41,9 @@ public class MinFrequencySpanTermQuery extends SpanQuery {
 
   /**
    * Expert: Construct a SpanTermQuery matching the named term's spans, using
-   * the provided TermContext
+   * the provided TermStates
    */
-  public MinFrequencySpanTermQuery(Term term, int minFrequency, TermContext context) {
+  public MinFrequencySpanTermQuery(Term term, int minFrequency, TermStates context) {
     this.term = Objects.requireNonNull(term);
     this.minFrequency = minFrequency;
     this.termContext = context;
@@ -55,26 +56,26 @@ public class MinFrequencySpanTermQuery extends SpanQuery {
   public String getField() { return term.field(); }
 
   @Override
-  public SpanWeight createWeight(IndexSearcher searcher, boolean needsScores, float boost) throws IOException {
-    final TermContext context;
+  public SpanWeight createWeight(IndexSearcher searcher, ScoreMode scoreMode, float boost) throws IOException {
+    final TermStates context;
     final IndexReaderContext topContext = searcher.getTopReaderContext();
-    if (termContext == null || termContext.wasBuiltFor(topContext) == false) {
-      context = TermContext.build(topContext, term);
+    if (termContext == null || !termContext.wasBuiltFor(topContext)) {
+      context = TermStates.build(topContext, term, scoreMode.needsScores());
     }
     else {
       context = termContext;
     }
-    return new SpanTermWeight(context, searcher, needsScores ? Collections.singletonMap(term, context) : null, boost);
+    return new SpanTermWeight(context, searcher, scoreMode.needsScores() ? Collections.singletonMap(term, context) : null, boost);
   }
 
   public class SpanTermWeight extends SpanWeight {
 
-    final TermContext termContext;
+    final TermStates termContext;
 
-    public SpanTermWeight(TermContext termContext, IndexSearcher searcher, Map<Term, TermContext> terms, float boost) throws IOException {
+    public SpanTermWeight(TermStates termContext, IndexSearcher searcher, Map<Term, TermStates> terms, float boost) throws IOException {
       super(MinFrequencySpanTermQuery.this, searcher, terms, boost);
       this.termContext = termContext;
-      assert termContext != null : "TermContext must not be null";
+      assert termContext != null : "TermStates must not be null";
     }
 
     @Override
@@ -88,7 +89,7 @@ public class MinFrequencySpanTermQuery extends SpanQuery {
     }
 
     @Override
-    public void extractTermContexts(Map<Term, TermContext> contexts) {
+    public void extractTermStates(Map<Term, TermStates> contexts) {
       contexts.put(term, termContext);
     }
 
@@ -97,7 +98,7 @@ public class MinFrequencySpanTermQuery extends SpanQuery {
 
       assert termContext.wasBuiltFor(ReaderUtil.getTopLevelContext(context)) : "The top-reader used to create Weight is not the same as the current reader's top-reader (" + ReaderUtil.getTopLevelContext(context);
 
-      final TermState state = termContext.get(context.ord);
+      final TermState state = termContext.get(context);
       if (state == null) { // term is not present in that reader
         assert context.reader().docFreq(term) == 0 : "no termstate found but term exists in reader term=" + term;
         return null;

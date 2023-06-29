@@ -69,10 +69,4 @@ public class MinFrequencyPostingsEnum extends PostingsEnum {
 	public long cost() {
 		return td.cost();
 	}
-
-	@Override
-	public AttributeSource attributes() {
-		return td.attributes();
-	}
-
 }

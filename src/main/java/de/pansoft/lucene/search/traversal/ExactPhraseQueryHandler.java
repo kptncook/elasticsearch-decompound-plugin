@@ -5,14 +5,14 @@ import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.spans.SpanNearQuery;
 import org.apache.lucene.search.spans.SpanTermQuery;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import de.pansoft.lucene.search.spans.SpanEmptyPayloadCheckQuery;
 
 public class ExactPhraseQueryHandler implements QueryHandler {
 	
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, QueryTraverser queryTraverser) {
 		final PhraseQuery phraseQuery = (PhraseQuery) query;
 		SpanNearQuery.Builder builder = new SpanNearQuery.Builder(phraseQuery.getTerms()[0].field(), phraseQuery.getSlop() == 0);
@@ -33,7 +33,7 @@ public class ExactPhraseQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context, Query query) {
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context, Query query) {
 		return query != null && query instanceof PhraseQuery;
 	}
 

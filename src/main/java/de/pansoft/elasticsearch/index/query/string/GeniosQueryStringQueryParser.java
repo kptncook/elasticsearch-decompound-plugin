@@ -5,7 +5,7 @@ import de.pansoft.lucene.index.query.term.MarkedTermQuery;
 import de.pansoft.lucene.search.traversal.*;
 import org.apache.lucene.queryparser.classic.ParseException;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 import java.util.Map;
 
@@ -23,19 +23,19 @@ public class GeniosQueryStringQueryParser extends QueryStringQueryParser {
     		new MarkTermQueryHandler(MarkedTermQuery.Context.PHRASE)
     );
 
-	private final QueryShardContext context;
+	private final SearchExecutionContext context;
 
-	public GeniosQueryStringQueryParser(QueryShardContext context, boolean lenient) {
+	public GeniosQueryStringQueryParser(SearchExecutionContext context, boolean lenient) {
 		super(context, lenient);
 		this.context = context;
 	}
 
-	public GeniosQueryStringQueryParser(QueryShardContext context, String defaultField, boolean isLenient) {
+	public GeniosQueryStringQueryParser(SearchExecutionContext context, String defaultField, boolean isLenient) {
 		super(context, defaultField, isLenient);
 		this.context = context;
 	}
 
-	public GeniosQueryStringQueryParser(QueryShardContext context, Map<String, Float> resolvedFields,
+	public GeniosQueryStringQueryParser(SearchExecutionContext context, Map<String, Float> resolvedFields,
 										boolean isLenient) {
 		super(context, resolvedFields, isLenient);
 		this.context = context;

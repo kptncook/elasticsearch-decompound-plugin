@@ -3,12 +3,12 @@ package de.pansoft.lucene.search.traversal;
 import org.apache.lucene.search.BooleanClause;
 import org.apache.lucene.search.BooleanQuery;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class CloneOnChangeBooleanQueryHandler implements QueryHandler {
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, final QueryTraverser queryTraverser) {
 		final BooleanQuery booleanQuery = (BooleanQuery) query;
 		boolean changed = false;
@@ -31,7 +31,7 @@ public class CloneOnChangeBooleanQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context, Query query) {
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context, Query query) {
 		return query != null && query instanceof BooleanQuery;
 	}
 

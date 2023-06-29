@@ -1,50 +1,38 @@
 package org.xbib.elasticsearch.index.analysis.decompound;
 
-import static org.hamcrest.Matchers.containsInAnyOrder;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.core.Is.is;
-
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.text.MessageFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
+import de.pansoft.elasticsearch.index.query.exact.ExactPhraseQueryBuilder;
+import de.pansoft.elasticsearch.index.query.string.GeniosQueryStringQueryBuilder;
 import org.elasticsearch.action.admin.cluster.node.info.NodeInfo;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
+import org.elasticsearch.action.admin.cluster.node.info.PluginsAndModules;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
-import org.elasticsearch.common.xcontent.LoggingDeprecationHandler;
-import org.elasticsearch.common.xcontent.ToXContent;
-import org.elasticsearch.common.xcontent.XContent;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentFactory;
-import org.elasticsearch.common.xcontent.XContentParser;
-import org.elasticsearch.common.xcontent.XContentType;
+import org.elasticsearch.common.xcontent.*;
 import org.elasticsearch.index.query.AbstractQueryBuilder;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryStringQueryBuilder;
 import org.elasticsearch.plugins.Plugin;
-import org.elasticsearch.plugins.PluginInfo;
+import org.elasticsearch.plugins.PluginDescriptor;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.test.ESIntegTestCase;
 import org.elasticsearch.test.StreamsUtils;
 import org.elasticsearch.test.hamcrest.ElasticsearchAssertions;
-//import org.elasticsearch.test.junit.annotations.TestLogging;
 import org.elasticsearch.transport.Netty4Plugin;
+import org.elasticsearch.xcontent.*;
 import org.junit.Before;
-import de.pansoft.elasticsearch.index.query.exact.ExactPhraseQueryBuilder;
-import de.pansoft.elasticsearch.index.query.string.GeniosQueryStringQueryBuilder;
 import org.xbib.elasticsearch.plugin.analysis.decompound.AnalysisDecompoundPlugin;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.text.MessageFormat;
+import java.util.*;
+
+import static org.hamcrest.Matchers.containsInAnyOrder;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.core.Is.is;
 
 //@TestLogging("level:DEBUG")
 public class DecompoundQueryIntegTest extends ESIntegTestCase {
@@ -53,12 +41,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
     protected Collection<Class<? extends Plugin>> nodePlugins() {
         return Arrays.asList(Netty4Plugin.class, AnalysisDecompoundPlugin.class);
     }
-    
+
     public void testPluginIsLoaded() {
-        NodesInfoResponse response = client().admin().cluster().prepareNodesInfo().setPlugins(true).get();
+        NodesInfoResponse response = client().admin().cluster().prepareNodesInfo().get();
         for (NodeInfo nodeInfo : response.getNodes()) {
             boolean pluginFound = false;
-            for (PluginInfo pluginInfo : nodeInfo.getPlugins().getPluginInfos()) {
+            for (PluginDescriptor pluginInfo : nodeInfo.getInfo(PluginsAndModules.class).getPluginInfos()) {
                 if (pluginInfo.getName().equals(AnalysisDecompoundPlugin.class.getName())) {
                     pluginFound = true;
                     break;
@@ -99,12 +87,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         assertHits(resp.getHits(), "2", "1");
 
     }
-   
+
     public void testNestedCommonPhraseQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-       
+
         QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:\"deutsche spielbankgesellschaft\"");
         ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(queryStringQueryBuilder, false);
         SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
@@ -122,13 +110,13 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         ElasticsearchAssertions.assertHitCount(resp3, 1L);
         assertHits(resp3.getHits(), "1");
     }
-    
-    
+
+
     public void testAllQueryTypesExactQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-      
+
         {
 			QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:bank");
 			ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(queryStringQueryBuilder, true);
@@ -160,12 +148,12 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
 			ElasticsearchAssertions.assertHitCount(resp, 0L);
         }
     }
-    
+
     public void testMinFrequencyExactQuery() throws Exception {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft als Bank"));
         indexRandom(true, false, reqs);
-       
+
         {
         	SearchSourceBuilder sourceBuilder = getFromSource("/minFrequencyTerm.json", "bank", 2, false);
 			SearchResponse resp = client().prepareSearch("test").setSource(sourceBuilder).get();
@@ -227,7 +215,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "deutsche Spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-       
+
         QueryStringQueryBuilder queryStringQueryBuilder = QueryBuilders.queryStringQuery("text:\"deutsche bank\"");
         SearchResponse resp = client().prepareSearch("test").setQuery(queryStringQueryBuilder).get();
         ElasticsearchAssertions.assertHitCount(resp, 1L);
@@ -340,7 +328,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
     }
 
     public void testKeywordOneTermQuery() throws Exception {
-    	
+
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("keyword", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
@@ -350,9 +338,9 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         ElasticsearchAssertions.assertHitCount(resp, 1L);
         assertHits(resp.getHits(), "1");
     }
-    
+
     public void testBoostedTermQuery() throws Exception {
-    	
+
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "spielbankgesellschaft", "text2", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
@@ -366,7 +354,39 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
         ElasticsearchAssertions.assertHitCount(resp, 0L);
     }
-    
+
+    public void testBoostedTermQueryWithRange() throws Exception {
+
+        List<IndexRequestBuilder> reqs = new ArrayList<>();
+        reqs.add(client().prepareIndex("test", "_doc", "1").setSource("text", "2020-05-01 2020-06-01 2020-07-1"));
+        indexRandom(true, false, reqs);
+
+        GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("text:>=2020-06-01");
+        Map<String, Float> fields = new HashMap<>();
+        fields.put("text", 2.0f);
+        fields.put("text2", 1.0f);
+        //geniosQueryStringQueryBuilder.fields(fields);
+        ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false, 100.0F);
+        SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
+        ElasticsearchAssertions.assertHitCount(resp, 0L);
+    }
+
+    public void testBoostedTermQueryWithDateRange() throws Exception {
+
+        List<IndexRequestBuilder> reqs = new ArrayList<>();
+        reqs.add(client().prepareIndex("test", "_doc", "1").setSource("date", "2020-05-01"));
+        indexRandom(true, false, reqs);
+
+        GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("date:>=2020-06-01");
+        Map<String, Float> fields = new HashMap<>();
+        fields.put("text", 2.0f);
+        fields.put("text2", 1.0f);
+        //geniosQueryStringQueryBuilder.fields(fields);
+        ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false, 100.0F);
+        SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
+        ElasticsearchAssertions.assertHitCount(resp, 0L);
+    }
+
     public void testGermanQuerySyntax() throws Exception {
 
         List<IndexRequestBuilder> reqs = new ArrayList<>();
@@ -388,7 +408,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
 			SearchResponse resp = client().prepareSearch("test").setQuery(exactPhraseQueryBuilder).get();
 			ElasticsearchAssertions.assertHitCount(resp, 3L);
         }
-    	
+
         {
 			GeniosQueryStringQueryBuilder geniosQueryStringQueryBuilder = new GeniosQueryStringQueryBuilder("bank NICHT spiel");
 			ExactPhraseQueryBuilder exactPhraseQueryBuilder = new ExactPhraseQueryBuilder(geniosQueryStringQueryBuilder, false);
@@ -398,7 +418,7 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
     }
 
     private void assertHits(SearchHits hits, String... ids) {
-        assertThat(hits.getTotalHits(), equalTo((long) ids.length));
+        assertThat(hits.getTotalHits().value, equalTo((long) ids.length));
         Set<String> hitIds = new HashSet<>();
         for (SearchHit hit : hits.getHits()) {
             hitIds.add(hit.getId());
@@ -411,25 +431,25 @@ public class DecompoundQueryIntegTest extends ESIntegTestCase {
         List<IndexRequestBuilder> reqs = new ArrayList<>();
         reqs.add(client().prepareIndex("test", "_doc", "1").setSource("keyword", "spielbankgesellschaft"));
         indexRandom(true, false, reqs);
-        
+
         String queryJson = StreamsUtils.copyToStringFromClasspath("/complex_query.json");
         final XContent xContent = XContentFactory.xContent(XContentType.JSON);
         XContentParser xContentParser = xContent.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, queryJson);
         QueryBuilder queryBuilder = AbstractQueryBuilder.parseInnerQueryBuilder(xContentParser);
-       
+
         final XContent xContentNew = XContentFactory.xContent(XContentType.JSON);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         XContentBuilder xContentBuilder = new XContentBuilder(xContentNew, baos);
         queryBuilder.toXContent(xContentBuilder, ToXContent.EMPTY_PARAMS);
         xContentBuilder.close();
         baos.close();
-        
+
         byte[] byteArray = baos.toByteArray();
         final XContent xContentCompare = XContentFactory.xContent(XContentType.JSON);
         XContentParser xContentParserCompare = xContentCompare.createParser(xContentRegistry(), LoggingDeprecationHandler.INSTANCE, byteArray);
         QueryBuilder queryBuilderCompare = AbstractQueryBuilder.parseInnerQueryBuilder(xContentParserCompare);
         assertEquals(queryBuilder, queryBuilderCompare);
-        
-    	
+
+
     }
 }

@@ -4,12 +4,12 @@ import java.util.ArrayList;
 
 import org.apache.lucene.search.DisjunctionMaxQuery;
 import org.apache.lucene.search.Query;
-import org.elasticsearch.index.query.QueryShardContext;
+import org.elasticsearch.index.query.SearchExecutionContext;
 
 public class CloneOnChangeDisjunctionMaxQueryHandler implements QueryHandler {
 
 	@Override
-	public Query handleQuery(final TraverserContext traverserContext, final QueryShardContext context,
+	public Query handleQuery(final TraverserContext traverserContext, final SearchExecutionContext context,
 							 final Query query, final QueryTraverser queryTraverser) {
 		final DisjunctionMaxQuery disjunctionMaxQuery = (DisjunctionMaxQuery) query;
 		boolean changed = false;
@@ -30,7 +30,7 @@ public class CloneOnChangeDisjunctionMaxQueryHandler implements QueryHandler {
 	}
 
 	@Override
-	public boolean acceptQuery(final TraverserContext traverserContext, final QueryShardContext context, Query query) {
+	public boolean acceptQuery(final TraverserContext traverserContext, final SearchExecutionContext context, Query query) {
 		return query != null && query instanceof DisjunctionMaxQuery;
 	}
 

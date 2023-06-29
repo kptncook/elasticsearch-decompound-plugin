@@ -38,9 +38,8 @@ import org.apache.lucene.search.BooleanQuery.TooManyClauses;
 import org.apache.lucene.util.BytesRef;
 import org.apache.lucene.util.BytesRefBuilder;
 import org.apache.lucene.util.QueryBuilder;
+import org.apache.lucene.util.automaton.Operations;
 import org.apache.lucene.util.automaton.RegExp;
-
-import static org.apache.lucene.util.automaton.Operations.DEFAULT_MAX_DETERMINIZED_STATES;
 
 /** This class is overridden by QueryParser in QueryParser.jj
  * and acts to separate the majority of the Java code from the .jj grammar file.
@@ -81,7 +80,7 @@ public abstract class QueryParserBase extends QueryBuilder implements CommonQuer
     Map<String,DateTools.Resolution> fieldToDateResolution = null;
 
     boolean autoGeneratePhraseQueries;
-    int maxDeterminizedStates = DEFAULT_MAX_DETERMINIZED_STATES;
+    int maxDeterminizedStates = Operations.DEFAULT_DETERMINIZE_WORK_LIMIT;
 
     // So the generated QueryParser(CharStream) won't error out
     protected QueryParserBase() {
